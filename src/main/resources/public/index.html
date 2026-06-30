@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+    <header class="app-header">
+        <div>
+            <h1>Training Tracker</h1>
+            <p id="statusText">Ładowanie...</p>
+        </div>
+        <button id="refreshButton" type="button">Odśwież</button>
+    </header>
+
+    <nav class="tabs">
+        <button class="tab-button active" type="button" data-tab="todayTab">Dzisiaj / wczoraj</button>
+        <button class="tab-button" type="button" data-tab="historyTab">Historia</button>
+    </nav>
+
+    <section id="todayTab" class="tab-panel active">
+        <div id="peopleList" class="people-list"></div>
+    </section>
+
+    <section id="historyTab" class="tab-panel">
+        <div class="history-header">
+            <h2>Pełna historia</h2>
+            <p>Starsze dni są tylko do podglądu. Edycja działa wyłącznie dla dzisiaj i wczoraj.</p>
+        </div>
+        <div class="table-wrapper">
+            <table id="historyTable">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <p id="message" class="message"></p>
+</main>
+
+<div id="photoModal" class="photo-modal" role="dialog" aria-modal="true" aria-labelledby="photoCaption" hidden>
+    <div class="photo-modal-backdrop" data-close-photo></div>
+    <div class="photo-modal-content">
+        <button id="closePhotoButton" class="photo-modal-close" type="button" aria-label="Zamknij zdjęcie">&times;</button>
+        <figure>
+            <img id="photoPreview" src="" alt="">
+            <figcaption id="photoCaption"></figcaption>
+        </figure>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
