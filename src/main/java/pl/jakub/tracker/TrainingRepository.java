@@ -50,6 +50,7 @@ public class TrainingRepository {
                         done INTEGER NOT NULL,
                         photo_data BLOB,
                         photo_content_type TEXT,
+                        photo_updated_at INTEGER,
                         UNIQUE(person_id, training_date),
                         FOREIGN KEY(person_id) REFERENCES people(id)
                     )
@@ -112,7 +113,7 @@ public class TrainingRepository {
             for (Person person : people) {
                 entries.put(person.id(), entryMap.getOrDefault(
                         key(person.id(), date),
-                        new HistoryTrainingEntryResponse(false, false)
+                        new HistoryTrainingEntryResponse(false, false, null)
                 ));
             }
             days.add(new HistoryDayResponse(date.toString(), entries));
@@ -155,9 +156,11 @@ public class TrainingRepository {
             throw new IllegalArgumentException("Zdjęcie można dodać tylko do wykonanego treningu");
         }
 
+        Long photoVersion = photo == null ? null : System.currentTimeMillis();
+
         try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement("""
-                INSERT INTO training_entries (person_id, training_date, done, photo_data, photo_content_type)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO training_entries (person_id, training_date, done, photo_data, photo_content_type, photo_updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(person_id, training_date)
                 DO UPDATE SET
                     done = excluded.done,
@@ -170,6 +173,11 @@ public class TrainingRepository {
                         WHEN excluded.done = 0 THEN NULL
                         WHEN excluded.photo_content_type IS NOT NULL THEN excluded.photo_content_type
                         ELSE training_entries.photo_content_type
+                    END,
+                    photo_updated_at = CASE
+                        WHEN excluded.done = 0 THEN NULL
+                        WHEN excluded.photo_data IS NOT NULL THEN excluded.photo_updated_at
+                        ELSE training_entries.photo_updated_at
                     END
                 """)) {
             statement.setInt(1, request.personId);
@@ -181,6 +189,11 @@ public class TrainingRepository {
             } else {
                 statement.setBytes(4, photo.data());
                 statement.setString(5, photo.contentType());
+            }
+            if (photoVersion == null) {
+                statement.setNull(6, Types.BIGINT);
+            } else {
+                statement.setLong(6, photoVersion);
             }
             statement.executeUpdate();
         }
@@ -208,7 +221,7 @@ public class TrainingRepository {
 
         try (Connection connection = connect();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT photo_data, photo_content_type
+                     SELECT photo_data, photo_content_type, photo_updated_at
                      FROM training_entries
                      WHERE person_id = ?
                        AND training_date = ?
@@ -223,7 +236,8 @@ public class TrainingRepository {
                 }
                 return new TrainingPhoto(
                         resultSet.getString("photo_content_type"),
-                        resultSet.getBytes("photo_data")
+                        resultSet.getBytes("photo_data"),
+                        getNullableLong(resultSet, "photo_updated_at")
                 );
             }
         }
@@ -249,6 +263,15 @@ public class TrainingRepository {
             if (!columns.contains("photo_content_type")) {
                 statement.executeUpdate("ALTER TABLE training_entries ADD COLUMN photo_content_type TEXT");
             }
+            if (!columns.contains("photo_updated_at")) {
+                statement.executeUpdate("ALTER TABLE training_entries ADD COLUMN photo_updated_at INTEGER");
+            }
+            statement.executeUpdate("""
+                    UPDATE training_entries
+                    SET photo_updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                    WHERE photo_data IS NOT NULL
+                      AND photo_updated_at IS NULL
+                    """);
         }
     }
 
@@ -327,13 +350,14 @@ public class TrainingRepository {
                 date.toString(),
                 state.done(),
                 true,
-                state.hasPhoto()
+                state.hasPhoto(),
+                state.photoVersion()
         ));
     }
 
     private CurrentEntryState getCurrentEntryState(Connection connection, int personId, LocalDate date) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT done, photo_data IS NOT NULL AS has_photo
+                SELECT done, photo_data IS NOT NULL AS has_photo, photo_updated_at
                 FROM training_entries
                 WHERE person_id = ? AND training_date = ?
                 """)) {
@@ -341,11 +365,12 @@ public class TrainingRepository {
             statement.setString(2, date.toString());
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
-                    return new CurrentEntryState(false, false);
+                    return new CurrentEntryState(false, false, null);
                 }
                 boolean done = resultSet.getInt("done") == 1;
                 boolean hasPhoto = done && resultSet.getInt("has_photo") == 1;
-                return new CurrentEntryState(done, hasPhoto);
+                Long photoVersion = hasPhoto ? getNullableLong(resultSet, "photo_updated_at") : null;
+                return new CurrentEntryState(done, hasPhoto, photoVersion);
             }
         }
     }
@@ -354,7 +379,7 @@ public class TrainingRepository {
         Map<String, HistoryTrainingEntryResponse> map = new HashMap<>();
         try (Connection connection = connect();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT person_id, training_date, done, photo_data IS NOT NULL AS has_photo
+                     SELECT person_id, training_date, done, photo_data IS NOT NULL AS has_photo, photo_updated_at
                      FROM training_entries
                      WHERE training_date BETWEEN ? AND ?
                      """)) {
@@ -366,7 +391,8 @@ public class TrainingRepository {
                     LocalDate date = LocalDate.parse(resultSet.getString("training_date"));
                     boolean done = resultSet.getInt("done") == 1;
                     boolean hasPhoto = done && resultSet.getInt("has_photo") == 1;
-                    map.put(key(personId, date), new HistoryTrainingEntryResponse(done, hasPhoto));
+                    Long photoVersion = hasPhoto ? getNullableLong(resultSet, "photo_updated_at") : null;
+                    map.put(key(personId, date), new HistoryTrainingEntryResponse(done, hasPhoto, photoVersion));
                 }
             }
         }
@@ -436,7 +462,12 @@ public class TrainingRepository {
         return (int) ChronoUnit.DAYS.between(startDate, today) + 1;
     }
 
-    private record CurrentEntryState(boolean done, boolean hasPhoto) {
+    private Long getNullableLong(ResultSet resultSet, String columnName) throws SQLException {
+        long value = resultSet.getLong(columnName);
+        return resultSet.wasNull() ? null : value;
+    }
+
+    private record CurrentEntryState(boolean done, boolean hasPhoto, Long photoVersion) {
     }
 
     private record PhotoUpload(String contentType, byte[] data) {

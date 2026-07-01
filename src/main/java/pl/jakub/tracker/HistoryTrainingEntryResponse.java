@@ -1,4 +1,4 @@
 package pl.jakub.tracker;
 
-public record HistoryTrainingEntryResponse(boolean done, boolean hasPhoto) {
+public record HistoryTrainingEntryResponse(boolean done, boolean hasPhoto, Long photoVersion) {
 }

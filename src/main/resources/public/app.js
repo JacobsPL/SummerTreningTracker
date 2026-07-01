@@ -326,7 +326,7 @@ function renderHistory(history) {
                     photoButton.type = 'button';
                     photoButton.className = 'photo-view-button';
                     photoButton.textContent = 'Zobacz zdjęcie';
-                    photoButton.addEventListener('click', () => openPhoto(person.id, day.date, person.name));
+                    photoButton.addEventListener('click', () => openPhoto(person.id, day.date, person.name, entry.photoVersion));
                     cell.appendChild(photoButton);
                 }
             }
@@ -343,14 +343,22 @@ function normalizeHistoryEntry(entry) {
     }
     return {
         done: entry && entry.done === true,
-        hasPhoto: entry && entry.hasPhoto === true
+        hasPhoto: entry && entry.hasPhoto === true,
+        photoVersion: entry ? entry.photoVersion : null
     };
 }
 
-function openPhoto(personId, date, personName) {
+function openPhoto(personId, date, personName, photoVersion) {
     photoCaption.textContent = `${personName} · ${formatDate(date)}`;
     photoPreview.alt = `Zdjęcie treningu: ${personName}, ${formatDate(date)}`;
-    photoPreview.src = `/api/training/photo?personId=${encodeURIComponent(personId)}&date=${encodeURIComponent(date)}&v=${Date.now()}`;
+    const params = new URLSearchParams({
+        personId,
+        date
+    });
+    if (photoVersion) {
+        params.set('v', photoVersion);
+    }
+    photoPreview.src = `/api/training/photo?${params.toString()}`;
     photoModal.hidden = false;
     document.body.classList.add('modal-open');
     closePhotoButton.focus();

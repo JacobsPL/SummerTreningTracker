@@ -58,6 +58,12 @@ public class Main {
             }
 
             ctx.contentType(photo.contentType());
+            if (photo.photoVersion() != null) {
+                ctx.header("Cache-Control", "public, max-age=31536000, immutable");
+                ctx.header("ETag", "\"" + photo.photoVersion() + "\"");
+            } else {
+                ctx.header("Cache-Control", "private, max-age=86400");
+            }
             ctx.result(new ByteArrayInputStream(photo.data()));
         });
 
