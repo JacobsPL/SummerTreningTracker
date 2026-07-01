@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class TrainingRepository {
-    private static final int MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+    private static final int MAX_PHOTO_BYTES = 10 * 1024 * 1024;
     private static final Set<String> ALLOWED_PHOTO_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -415,7 +415,7 @@ public class TrainingRepository {
             throw new IllegalArgumentException("Zdjęcie jest puste");
         }
         if (data.length > MAX_PHOTO_BYTES) {
-            throw new IllegalArgumentException("Zdjęcie może mieć maksymalnie 5 MB");
+            throw new IllegalArgumentException("Zdjęcie może mieć maksymalnie 10 MB");
         }
 
         return new PhotoUpload(contentType, data);

@@ -9,8 +9,15 @@ const photoPreview = document.getElementById('photoPreview');
 const photoCaption = document.getElementById('photoCaption');
 const closePhotoButton = document.getElementById('closePhotoButton');
 
-const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
+const TARGET_COMPRESSED_PHOTO_SIZE = 900 * 1024;
+const COMPRESSED_PHOTO_TYPE = 'image/jpeg';
+const COMPRESSION_PROFILES = [
+    { maxSide: 1600, quality: 0.72 },
+    { maxSide: 1400, quality: 0.64 },
+    { maxSide: 1280, quality: 0.58 },
+    { maxSide: 1024, quality: 0.52 }
+];
 
 function setMessage(text) {
     message.textContent = text || '';
@@ -51,22 +58,95 @@ function validatePhoto(file) {
     if (!file) {
         throw new Error('Nie wybrano zdjęcia');
     }
-    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
-        throw new Error('Dozwolone są zdjęcia JPG, PNG, WEBP albo GIF');
+    if (file.type && !file.type.startsWith('image/')) {
+        throw new Error('Wybierz plik obrazu');
     }
     if (file.size > MAX_PHOTO_SIZE) {
-        throw new Error('Zdjęcie może mieć maksymalnie 5 MB');
+        throw new Error('Zdjęcie może mieć maksymalnie 10 MB');
     }
 }
 
-function readPhotoDataUrl(file) {
+async function readPhotoDataUrl(file) {
     validatePhoto(file);
+    const compressedPhoto = await compressPhoto(file);
+    if (compressedPhoto.size > MAX_PHOTO_SIZE) {
+        throw new Error('Zdjęcie po kompresji nadal jest za duże');
+    }
+    return blobToDataUrl(compressedPhoto);
+}
 
+async function compressPhoto(file) {
+    const image = await loadImage(file);
+    let bestBlob = null;
+
+    for (const profile of COMPRESSION_PROFILES) {
+        const canvas = drawImageToCanvas(image, profile.maxSide);
+        const blob = await canvasToBlob(canvas, COMPRESSED_PHOTO_TYPE, profile.quality);
+        bestBlob = blob;
+        if (blob.size <= TARGET_COMPRESSED_PHOTO_SIZE) {
+            break;
+        }
+    }
+
+    return bestBlob;
+}
+
+function loadImage(file) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        const url = URL.createObjectURL(file);
+
+        image.addEventListener('load', () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+        }, { once: true });
+
+        image.addEventListener('error', () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Nie można odczytać zdjęcia'));
+        }, { once: true });
+
+        image.src = url;
+    });
+}
+
+function drawImageToCanvas(image, maxSide) {
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement('canvas');
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    return canvas;
+}
+
+function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+            if (blob) {
+                resolve(blob);
+                return;
+            }
+            reject(new Error('Nie można skompresować zdjęcia'));
+        }, type, quality);
+    });
+}
+
+function blobToDataUrl(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.addEventListener('load', () => resolve(reader.result));
         reader.addEventListener('error', () => reject(new Error('Nie można odczytać zdjęcia')));
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(blob);
     });
 }
 

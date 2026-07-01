@@ -15,6 +15,7 @@ Stos:
 - Licznik przy osobie: `liczba wykonanych treningów / liczba dni od startu`.
 - Start liczenia dni: domyślnie `2026-07-01`.
 - Przy osobie widoczne są checkboxy dla dzisiaj i wczoraj.
+- Do wykonanego treningu można dodać zdjęcie. Plik wejściowy może mieć do 10 MB, a przeglądarka kompresuje go przed zapisem do bazy.
 - Pełna historia jest w osobnej zakładce.
 - Backend blokuje edycję starszych dni i przyszłości.
 - Dane zapisują się w SQLite: `data/training.db`.

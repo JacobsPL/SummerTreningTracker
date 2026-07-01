@@ -10,6 +10,7 @@ import java.time.ZoneId;
 import java.util.Map;
 
 public class Main {
+    private static final long MAX_REQUEST_SIZE_BYTES = 15L * 1024 * 1024;
     private static final ZoneId ZONE = ZoneId.of("Europe/Warsaw");
     private static final LocalDate START_DATE = LocalDate.parse(
             System.getenv().getOrDefault("START_DATE", "2026-07-01")
@@ -22,6 +23,7 @@ public class Main {
         repository.init();
 
         Javalin app = Javalin.create(config -> {
+            config.http.maxRequestSize = MAX_REQUEST_SIZE_BYTES;
             config.staticFiles.add(staticFiles -> {
                 staticFiles.hostedPath = "/";
                 staticFiles.directory = "/public";
