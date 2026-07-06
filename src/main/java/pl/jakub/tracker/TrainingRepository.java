@@ -10,6 +10,8 @@ import java.util.*;
 
 public class TrainingRepository {
     private static final int MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+    private static final String WIKTORIA_NAME = "Wiktoria";
+    private static final LocalDate WIKTORIA_BACKFILL_THROUGH = LocalDate.of(2026, 7, 6);
     private static final Set<String> ALLOWED_PHOTO_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -58,6 +60,7 @@ public class TrainingRepository {
 
             ensurePhotoColumns(connection);
             ensureDefaultPeople(connection);
+            ensureWiktoriaTrainingEntries(connection);
         } catch (SQLException e) {
             throw new RuntimeException("Nie można zainicjalizować bazy danych", e);
         }
@@ -295,6 +298,71 @@ public class TrainingRepository {
                 statement.executeUpdate();
             }
         }
+    }
+
+    private void ensureWiktoriaTrainingEntries(Connection connection) throws SQLException {
+        int wiktoriaId = ensurePerson(connection, WIKTORIA_NAME);
+        LocalDate today = today();
+        LocalDate backfillThrough = today.isBefore(WIKTORIA_BACKFILL_THROUGH)
+                ? today
+                : WIKTORIA_BACKFILL_THROUGH;
+
+        if (backfillThrough.isBefore(startDate)) {
+            return;
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO training_entries (person_id, training_date, done)
+                VALUES (?, ?, 1)
+                ON CONFLICT(person_id, training_date)
+                DO NOTHING
+                """)) {
+            for (LocalDate date = startDate; !date.isAfter(backfillThrough); date = date.plusDays(1)) {
+                statement.setInt(1, wiktoriaId);
+                statement.setString(2, date.toString());
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    private int ensurePerson(Connection connection, String name) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT id
+                FROM people
+                WHERE name = ?
+                ORDER BY id
+                LIMIT 1
+                """)) {
+            statement.setString(1, name);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt("id");
+                }
+            }
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO people (name) VALUES (?)",
+                Statement.RETURN_GENERATED_KEYS
+        )) {
+            statement.setString(1, name);
+            statement.executeUpdate();
+
+            try (ResultSet resultSet = statement.getGeneratedKeys()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt(1);
+                }
+            }
+        }
+
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT last_insert_rowid()")) {
+            if (resultSet.next()) {
+                return resultSet.getInt(1);
+            }
+        }
+
+        throw new SQLException("Nie można dopisać osoby: " + name);
     }
 
     private List<Person> getPeople() throws SQLException {

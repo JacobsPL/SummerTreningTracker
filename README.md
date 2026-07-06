@@ -1,6 +1,6 @@
 # Training Tracker
 
-Bardzo prosta aplikacja webowa do śledzenia treningów 4 zawodników.
+Bardzo prosta aplikacja webowa do śledzenia treningów 5 zawodników.
 
 Stos:
 
@@ -11,7 +11,7 @@ Stos:
 
 ## Funkcje
 
-- Zawodnicy startowi: `Julka`, `Wiktor`, `Jakub`, `Wojtek`.
+- Zawodnicy startowi: `Julka`, `Wiktor`, `Jakub`, `Wojtek`, `Wiktoria`.
 - Licznik przy osobie: `liczba wykonanych treningów / liczba dni od startu`.
 - Start liczenia dni: domyślnie `2026-07-01`.
 - Przy osobie widoczne są checkboxy dla dzisiaj i wczoraj.
@@ -90,9 +90,12 @@ Aktualna lista:
 2. Wiktor
 3. Jakub
 4. Wojtek
+5. Wiktoria
 ```
 
 Przy starcie aplikacja wykonuje `INSERT ... ON CONFLICT`, więc jeśli baza `data/training.db` już istnieje, zawodnicy o ID 1-4 zostaną dopisani albo zaktualizowani automatycznie po restarcie aplikacji.
+
+Wiktoria jest dopisywana po nazwie, bez nadpisywania istniejących osób. Jej brakujące treningi od daty startu do `2026-07-06` są uzupełniane jako wykonane przez `INSERT ... ON CONFLICT DO NOTHING`, więc istniejące wpisy treningów, zdjęcia i ręczne zmiany w bazie nie są kasowane ani nadpisywane.
 
 Jeżeli chcesz wyczyścić całą historię i zacząć od zera:
 
