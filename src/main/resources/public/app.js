@@ -1,6 +1,7 @@
 const peopleList = document.getElementById('peopleList');
 const historyTableHead = document.querySelector('#historyTable thead');
 const historyTableBody = document.querySelector('#historyTable tbody');
+const historyCards = document.getElementById('historyCards');
 const statusText = document.getElementById('statusText');
 const message = document.getElementById('message');
 const refreshButton = document.getElementById('refreshButton');
@@ -165,10 +166,24 @@ function formatDate(dateText) {
 
 function renderStatus(status) {
     if (status.daysSoFar === 0) {
-        statusText.textContent = `Plan startuje ${formatDate(status.startDate)}. Dzisiaj: ${formatDate(status.today)}.`;
+        statusText.textContent = `Start ${formatDate(status.startDate)} · dzisiaj ${formatDate(status.today)}`;
         return;
     }
-    statusText.textContent = `Dzień ${status.daysSoFar} planu. Start: ${formatDate(status.startDate)}.`;
+    statusText.textContent = `Dzień ${status.daysSoFar} planu · start ${formatDate(status.startDate)}`;
+}
+
+function progressPercent(completed, daysSoFar) {
+    if (!daysSoFar) {
+        return 0;
+    }
+    return Math.min(100, Math.round((completed / daysSoFar) * 100));
+}
+
+function createCameraIcon() {
+    const icon = document.createElement('span');
+    icon.className = 'camera-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    return icon;
 }
 
 function renderSummary(summary) {
@@ -182,34 +197,75 @@ function renderSummary(summary) {
     for (const person of summary) {
         const card = document.createElement('article');
         card.className = 'person-card';
+        const percent = progressPercent(person.completed, person.daysSoFar);
 
-        const top = document.createElement('div');
-        top.className = 'person-top';
-        top.innerHTML = `
-            <div class="person-name">${person.name}</div>
-            <div class="counter">${person.completed}/${person.daysSoFar}</div>
-        `;
-        card.appendChild(top);
+        const header = document.createElement('div');
+        header.className = 'person-card-header';
+
+        const name = document.createElement('h3');
+        name.className = 'person-name';
+        name.textContent = person.name;
+
+        const score = document.createElement('div');
+        score.className = 'person-score';
+        score.innerHTML = `<strong>${person.completed}</strong><span>/${person.daysSoFar}</span>`;
+
+        header.appendChild(name);
+        header.appendChild(score);
+        card.appendChild(header);
+
+        const progress = document.createElement('div');
+        progress.className = 'progress';
+        progress.setAttribute('aria-label', `${person.name}: ${percent}% planu`);
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        progressBar.style.width = `${percent}%`;
+        progress.appendChild(progressBar);
+        card.appendChild(progress);
 
         if (!person.visibleDays || person.visibleDays.length === 0) {
             const empty = document.createElement('p');
-            empty.textContent = 'Checkboxy pojawią się od dnia startu planu.';
+            empty.className = 'card-note';
+            empty.textContent = 'Plan jeszcze nie wystartował.';
             card.appendChild(empty);
         } else {
             for (const day of person.visibleDays) {
                 const row = document.createElement('div');
                 row.className = 'day-row';
+                row.classList.toggle('done-row', day.done);
 
                 const label = document.createElement('div');
-                label.innerHTML = `
-                    <span class="day-label">${day.label}</span>
-                    <span class="day-date">${formatDate(day.date)}</span>
-                `;
+                label.className = 'day-info';
+
+                const dayLabel = document.createElement('span');
+                dayLabel.className = 'day-label';
+                dayLabel.textContent = day.label;
+
+                const dayDate = document.createElement('span');
+                dayDate.className = 'day-date';
+                dayDate.textContent = formatDate(day.date);
+
+                label.appendChild(dayLabel);
+                label.appendChild(dayDate);
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
+                checkbox.className = 'status-checkbox';
                 checkbox.checked = day.done;
                 checkbox.disabled = !day.editable;
+                checkbox.setAttribute('aria-label', `${person.name}: ${day.label.toLowerCase()} ${formatDate(day.date)}`);
+
+                const statusToggle = document.createElement('label');
+                statusToggle.className = 'status-toggle';
+                statusToggle.title = day.done ? 'Oznacz jako niewykonane' : 'Oznacz jako wykonane';
+
+                const statusControl = document.createElement('span');
+                statusControl.className = 'status-control';
+                statusControl.setAttribute('aria-hidden', 'true');
+
+                statusToggle.appendChild(checkbox);
+                statusToggle.appendChild(statusControl);
 
                 const controls = document.createElement('div');
                 controls.className = 'day-controls';
@@ -218,14 +274,22 @@ function renderSummary(summary) {
                 fileInput.type = 'file';
                 fileInput.accept = 'image/*';
                 fileInput.className = 'visually-hidden';
+                fileInput.tabIndex = -1;
+                fileInput.setAttribute('aria-hidden', 'true');
 
                 const photoButton = document.createElement('button');
                 photoButton.type = 'button';
-                photoButton.className = 'photo-button';
+                photoButton.className = 'photo-button icon-button';
+                photoButton.appendChild(createCameraIcon());
 
                 function updatePhotoButton() {
-                    photoButton.textContent = day.hasPhoto ? 'Zmień zdjęcie' : 'Dodaj zdjęcie';
+                    const labelText = day.hasPhoto ? 'Zmień zdjęcie' : 'Dodaj zdjęcie';
+                    photoButton.classList.toggle('has-photo', day.hasPhoto);
+                    photoButton.setAttribute('aria-label', `${labelText}: ${person.name}, ${day.label.toLowerCase()}`);
+                    photoButton.title = labelText;
                     photoButton.disabled = checkbox.disabled;
+                    statusToggle.title = checkbox.checked ? 'Oznacz jako niewykonane' : 'Oznacz jako wykonane';
+                    row.classList.toggle('done-row', checkbox.checked);
                 }
 
                 updatePhotoButton();
@@ -274,7 +338,7 @@ function renderSummary(summary) {
                 row.appendChild(label);
                 controls.appendChild(fileInput);
                 controls.appendChild(photoButton);
-                controls.appendChild(checkbox);
+                controls.appendChild(statusToggle);
                 row.appendChild(controls);
                 card.appendChild(row);
             }
@@ -287,9 +351,20 @@ function renderSummary(summary) {
 function renderHistory(history) {
     historyTableHead.innerHTML = '';
     historyTableBody.innerHTML = '';
+    historyCards.innerHTML = '';
 
     const headerRow = document.createElement('tr');
-    headerRow.innerHTML = '<th>Data</th>' + history.people.map(person => `<th>${person.name}</th>`).join('');
+    const dateHeader = document.createElement('th');
+    dateHeader.scope = 'col';
+    dateHeader.textContent = 'Data';
+    headerRow.appendChild(dateHeader);
+
+    for (const person of history.people) {
+        const header = document.createElement('th');
+        header.scope = 'col';
+        header.textContent = person.name;
+        headerRow.appendChild(header);
+    }
     historyTableHead.appendChild(headerRow);
 
     if (!history.days || history.days.length === 0) {
@@ -308,32 +383,85 @@ function renderHistory(history) {
         dateCell.textContent = formatDate(day.date);
         row.appendChild(dateCell);
 
+        const historyCard = document.createElement('article');
+        historyCard.className = 'history-card';
+
+        const historyDate = document.createElement('div');
+        historyDate.className = 'history-card-date';
+        historyDate.textContent = formatDate(day.date);
+        historyCard.appendChild(historyDate);
+
+        const historyList = document.createElement('div');
+        historyList.className = 'history-card-list';
+
         for (const person of history.people) {
             const cell = document.createElement('td');
             const entry = normalizeHistoryEntry(day.entries[String(person.id)]);
+            cell.dataset.state = entry.done ? 'done' : 'missed';
+
+            const mobileRow = document.createElement('div');
+            mobileRow.className = 'history-card-row';
+
+            const mobileName = document.createElement('span');
+            mobileName.className = 'history-card-name';
+            mobileName.textContent = person.name;
+
+            const mobileStatus = document.createElement('span');
+            mobileStatus.className = entry.done ? 'history-card-status done' : 'history-card-status missed';
+
+            mobileRow.appendChild(mobileName);
 
             if (!entry.done) {
-                cell.textContent = '—';
+                const empty = document.createElement('span');
+                empty.className = 'history-empty';
+                empty.textContent = '—';
+                empty.setAttribute('aria-label', 'Brak treningu');
+                cell.appendChild(empty);
+
+                mobileStatus.textContent = '—';
             } else {
-                const marker = document.createElement('span');
-                marker.className = 'done-marker';
-                marker.textContent = '✓';
-                cell.appendChild(marker);
                 cell.className = 'done';
+                mobileStatus.textContent = '✓';
 
                 if (entry.hasPhoto) {
                     const photoButton = document.createElement('button');
                     photoButton.type = 'button';
-                    photoButton.className = 'photo-view-button';
-                    photoButton.textContent = 'Zobacz zdjęcie';
+                    photoButton.className = 'history-photo-button icon-button';
+                    photoButton.appendChild(createCameraIcon());
+                    photoButton.setAttribute('aria-label', `Zdjęcie treningu: ${person.name}, ${formatDate(day.date)}`);
+                    photoButton.title = 'Zobacz zdjęcie';
                     photoButton.addEventListener('click', () => openPhoto(person.id, day.date, person.name, entry.photoVersion));
                     cell.appendChild(photoButton);
+                    mobileStatus.classList.add('has-photo');
+                    mobileStatus.textContent = '';
+                    mobileStatus.appendChild(createCameraIcon());
+                    mobileStatus.setAttribute('aria-label', `Trening wykonany, zdjęcie dodane: ${person.name}, ${formatDate(day.date)}`);
+                    mobileStatus.addEventListener('click', () => openPhoto(person.id, day.date, person.name, entry.photoVersion));
+                    mobileStatus.setAttribute('role', 'button');
+                    mobileStatus.tabIndex = 0;
+                    mobileStatus.title = 'Zobacz zdjęcie';
+                    mobileStatus.addEventListener('keydown', event => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openPhoto(person.id, day.date, person.name, entry.photoVersion);
+                        }
+                    });
+                } else {
+                    const marker = document.createElement('span');
+                    marker.className = 'history-check';
+                    marker.textContent = '✓';
+                    marker.setAttribute('aria-label', 'Trening wykonany');
+                    cell.appendChild(marker);
                 }
             }
+            mobileRow.appendChild(mobileStatus);
+            historyList.appendChild(mobileRow);
             row.appendChild(cell);
         }
 
         historyTableBody.appendChild(row);
+        historyCard.appendChild(historyList);
+        historyCards.appendChild(historyCard);
     }
 }
 
@@ -410,11 +538,16 @@ document.addEventListener('keydown', event => {
 });
 
 for (const button of document.querySelectorAll('.tab-button')) {
+    button.setAttribute('aria-selected', button.classList.contains('active') ? 'true' : 'false');
     button.addEventListener('click', () => {
-        document.querySelectorAll('.tab-button').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(item => {
+            item.classList.remove('active');
+            item.setAttribute('aria-selected', 'false');
+        });
         document.querySelectorAll('.tab-panel').forEach(item => item.classList.remove('active'));
 
         button.classList.add('active');
+        button.setAttribute('aria-selected', 'true');
         document.getElementById(button.dataset.tab).classList.add('active');
     });
 }

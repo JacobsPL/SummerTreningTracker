@@ -2,4 +2,4 @@
 set -e
 
 mvn package
-java -jar target/training-tracker-1.0.0.jar
+PORT=7070 java -jar target/training-tracker-1.0.0.jar

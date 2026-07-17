@@ -9,14 +9,16 @@
 <body>
 <main class="app">
     <header class="app-header">
-        <div>
+        <div class="app-title">
             <h1>Training Tracker</h1>
-            <p id="statusText">Ładowanie...</p>
+            <p id="statusText" class="status-text">Ładowanie...</p>
         </div>
-        <button id="refreshButton" type="button">Odśwież</button>
+        <button id="refreshButton" class="icon-button refresh-button" type="button" aria-label="Odśwież dane" title="Odśwież">
+            <span aria-hidden="true">↻</span>
+        </button>
     </header>
 
-    <nav class="tabs">
+    <nav class="tabs" aria-label="Widoki">
         <button class="tab-button active" type="button" data-tab="todayTab">Dzisiaj / wczoraj</button>
         <button class="tab-button" type="button" data-tab="historyTab">Historia</button>
     </nav>
@@ -28,7 +30,6 @@
     <section id="historyTab" class="tab-panel">
         <div class="history-header">
             <h2>Pełna historia</h2>
-            <p>Starsze dni są tylko do podglądu. Edycja działa wyłącznie dla dzisiaj i wczoraj.</p>
         </div>
         <div class="table-wrapper">
             <table id="historyTable">
@@ -36,6 +37,7 @@
                 <tbody></tbody>
             </table>
         </div>
+        <div id="historyCards" class="history-cards"></div>
     </section>
 
     <p id="message" class="message"></p>
